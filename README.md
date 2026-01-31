@@ -1,2 +1,2 @@
 # SNOC
-Implementing the StriNg Oriented symBOlic Language pattern matching in C
+Implementing the StriNg Oriented symBOlic Language "patterns" in C
