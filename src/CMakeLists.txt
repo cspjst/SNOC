@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Warning: This skips critical compiler checks. Only use this if Watcom fails CMake's detection
+# Warning: This skips critical compiler checks.
+# Only use this if Watcom fails CMake's detection
 # Necessary to suppress compiler checks for cross compilation using OW2 and C under ARM environments
 set(CMAKE_C_COMPILER_WORKS 1)
 
 project(
-    TUI
+    SNOC
     VERSION 0.1.0
     LANGUAGES C
 )
@@ -38,18 +39,17 @@ add_definitions(
   )
 endif()
 
-# WARNING: Using GLOB for convenience. If adding new files, rerun:
-#   ./cmk.sh
+# WARNING: Using GLOB for convenience. If adding new files, rerun: ./cmk.sh
 file(GLOB SOURCES
     CONFIGURE_DEPENDS
     *.c
-    DOPE/*.c
+    SNOC/*.c
 )
 
 # message(Source list="${SOURCES}")
 
-add_executable(DOPE ${SOURCES})
+add_executable(SNOC ${SOURCES})
 
 # Optional: Install target
 # rename me...
-#install(TARGETS example DESTINATION bin)
+#install(TARGETS snoc DESTINATION bin)
