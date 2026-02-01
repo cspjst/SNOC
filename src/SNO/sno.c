@@ -1,20 +1,6 @@
 #include "sno.h"
 #include <string.h>
 
-void sno_reset(sno_subject_t* s) {
-    s->view.begin = s->str.begin;
-    s->view.end = s->view.begin;
-}
-
-void sno_anchor(sno_subject_t* s) {
-    sno_reset(s);
-    s->anchored = true;
-}
-
-void sno_unanchor(sno_subject_t* s) {
-    s->anchored = false;
-}
-
 void sno_bind(sno_subject_t* s, cstr_t* c) {
     if(s && c) {
         s->str.begin = s->str.end = s->view.begin = s->view.end = c;
@@ -29,6 +15,22 @@ void sno_var(sno_subject_t* s, char* c) {
         size_t sz = s->view.end - s->view.begin;
         memcpy(c, s->view.begin, sz);
         c[sz] = '\0';
+    }
+}
+
+void sno_anchor(sno_subject_t* s) {
+    sno_reset(s);
+    if(s) s->anchored = true;
+}
+
+void sno_unanchor(sno_subject_t* s) {
+    if(s) s->anchored = false;
+}
+
+void sno_reset(sno_subject_t* s) {
+    if(s) {
+        s->view.begin = s->str.begin;
+        s->view.end = s->view.begin;
     }
 }
 
@@ -48,6 +50,12 @@ bool sno_len(sno_subject_t* s, size_t n) {
     if(needle >= s->str.end) return false;
     s->view.begin = s->anchored ?s->str.begin :s->view.end;
     s->view.end = needle;
+    return true;
+}
+
+bool sno_len_var(sno_subject_t* s, size_t n, char* c) {
+    if(!sno_len(s, n)) return false;
+    sno_var(s, c);
     return true;
 }
 

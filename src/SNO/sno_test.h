@@ -20,9 +20,14 @@ void sno_test() {
     sno_reset(&s);
     if(sno_lit(&s, '(') && sno_len(&s, 3)) sno_print(s.view);
     sno_var(&s, v);
-    printf("%s\n", v);
+    printf("var %s\n", v);
     sno_reset(&s);
     if(sno_lit(&s, '(') && sno_len(&s, 2) && sno_lit(&s, ')')) sno_print(s.view);
+    sno_reset(&s);
+    if(sno_lit(&s, '(') && sno_len_var(&s, 2, v) && sno_lit(&s, ']')) printf("var %s\n", v);
+    sno_reset(&s);
+    if(sno_lit(&s, '(') && sno_len_var(&s, 2, v) && sno_lit(&s, ')')) printf("var %s\n", v);
+
 
 }
 
