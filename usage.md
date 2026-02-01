@@ -102,7 +102,52 @@ alpha
 
 Each `sno_len` consumes a fixed prefix. The position (`s.view.end`) automatically advances to the next field—no manual pointer arithmetic required. The matched prefix is available in `s.view`; the remainder starts at `s.view.end`.
 
-### 2.4`sno_len_var` — Match and Extract in One Step
+### 2.4 `sno_var` — Extract Matched Text to Buffer
+
+`sno_var(s, buf, len)` copies the current match into `buf` as a null‑terminated C string. A straightforward way to pull substrings out of a subject string—exactly what most developers reach for when parsing.
+
+- **Success**: `buf` receives a null‑terminated copy of `s.view` - cursor unchanged
+- **Failure**: returns `false` if `buf` is too small or arguments are invalid - cursor unchanged
+
+###### Example  — Key Extraction
+
+```c
+sno_subject_t s = {0};
+char key[16];
+
+sno_bind(&s, "host=alpha");
+sno_len(&s, 4);                  /* match "host" */
+sno_var(&s, key, sizeof(key));   /* key = "host" */
+printf("%s\n", key);             
+```
+
+###### Output:
+
+```
+host
+```
+
+The `sno_var` function is bounds‑checked, such that, if `buf` is too small to hold the match plus a null terminator, it fails safely and leaves the parser state unchanged. This makes it reliable inside `&&` chains—failed copies never corrupt subsequent parsing steps.
+
+Example  — Value Extraction
+
+```c
+char val[16];
+sno_bind(&s, "host=alpha");
+if (sno_len(&s, 4) && sno_lit(&s, '=') && sno_len(&s, 5) && sno_var(&s, val, sizeof(val))) {
+    printf("value=%s\n", val);   
+}
+```
+
+###### Output:
+
+```
+value=alpha
+```
+
+Use `sno_var` whenever you need a standard C string for `printf`, library calls, or storage. The match happens first (`sno_len`, `sno_span`, etc.), then extraction follows in a single, safe step.
+
+### 2.5`sno_len_var` — Match and Extract in One Step
 
 `sno_len_var(s, n, buf, len)` matches exactly `n` characters and copies them into `buf` with null termination.
 

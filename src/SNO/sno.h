@@ -197,14 +197,7 @@ bool sno_len_var(sno_subject_t* s, size_t n, char* buf, size_t buflen);
  * @note Whitespace set = " \t\r\n"
  * @note Zero-length success: view = [cursor, cursor) when no whitespace present
  */
-static inline bool sno_ws(sno_subject_t* s) {
-    if (!s) return false;
-    sno_view_t saved = s->view;  // save current view state
-    if (sno_span(s, " \t\r\n")) return true;  // consumed 1+ whitespace → view already set correctly
-    // Zero whitespace present → succeed with empty span at current cursor
-    s->view.begin = s->view.end;  // [cursor, cursor)
-    return true;
-}
+ bool sno_ws(sno_subject_t* s);
 
 /**
  * @brief Match 1+ whitespace characters
@@ -251,6 +244,9 @@ static inline bool sno_alnum(sno_subject_t* s) {
     return sno_span(s, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
 }
 
+#endif
+
+
 /**
  * @brief Match everything until (but not including) delimiter character
  *
@@ -261,14 +257,10 @@ static inline bool sno_alnum(sno_subject_t* s) {
  * @note Does not consume the delimiter—cursor stops before it.
  * @note Empty match succeeds when cursor starts at delimiter.
  */
+ /*
 static inline bool sno_until(sno_subject_t* s, char delim) {
     char set[2] = {' ', '\0'};
     set[0] = delim;
     return sno_break(s, set);
 }
-
-void sno_fprint(FILE* f, sno_view_t v);
-void sno_dump(FILE* f, sno_subject_t* s);
-inline void sno_print(sno_view_t v) { sno_fprint(stdout, v); }
-
-#endif
+*/

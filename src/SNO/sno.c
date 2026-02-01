@@ -73,3 +73,12 @@ bool sno_len_var(sno_subject_t* s, size_t n, char* buf, size_t buflen) {
     s->view = v;                     // rollback on extraction failure
     return false;
 }
+
+bool sno_ws(sno_subject_t* s) {
+   if (!s) return false;
+   sno_view_t saved = s->view;  // save current view state
+   if (sno_span(s, " \t\r\n")) return true;  // consumed 1+ whitespace → view already set correctly
+   // Zero whitespace present → succeed with empty span at current cursor
+   s->view.begin = s->view.end;  // [cursor, cursor)
+   return true;
+}
