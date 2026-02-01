@@ -1,4 +1,4 @@
-# SNOC
+# SNOC Library
 ## Implementing the StriNg Oriented symBOlic Language patterns in C.
 
 Importing the practical discrete recognition systems from SNOBOL4 into C for powerful string handling and parsing whilst maintaing C idioms. 
