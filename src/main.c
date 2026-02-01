@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include "SNOC/snoc_test.h"
+#include "SNO/sno_test.h"
 
 int main() {
-    printf("SNOC\n");
-    snoc_test();
+    printf("SNO\n");
+    sno_test();
 }

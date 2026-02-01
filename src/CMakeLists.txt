@@ -43,7 +43,7 @@ endif()
 file(GLOB SOURCES
     CONFIGURE_DEPENDS
     *.c
-    SNOC/*.c
+    SNO/*.c
 )
 
 # message(Source list="${SOURCES}")
