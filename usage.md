@@ -1,99 +1,18 @@
+## 1. The SNO Library
+
+### Implementing the StriNg Oriented symBOlic Language patterns in C
+
+Importing the practical discrete recognition systems from SNOBOL4 into C for powerful string handling and parsing whilst maintaing C idioms.
+
 ## 2. Patterns and Pattern Functions
 
-In `sno`, a pattern is not a compiled regular expression or a data structure—it is an ordinary C function that matches text and advances a cursor. These pattern functions are the atomic building blocks of parsing, each consumes zero or more characters from the current position, returns success or failure, and leaves the parser in a well-defined state.
+### Patterns Are Functions
 
-### SNOBOL Heritage, C Execution Model
+Pattern functions are ordinary C functions that match text and advance a cursor. Each consumes zero or more characters from the current position, returns a boolean success/failure result, and leaves the parser in a well-defined state. They compose naturally using C's native `&&` and `||` operators—no macros, no DSL, no hidden engine.
 
-`sno` draws direct inspiration from SNOBOL4's pattern algebra—LEN, SPAN, BREAK—but adapts it to C's imperative semantics:
+Inspired by SNOBOL4's LEN, SPAN, and BREAK primitives, `sno` adapts their elegance to C's imperative model. Where SNOBOL constructs pattern values then applies them to a subject, `sno` executes matches immediately through direct function calls—eliminating an entire layer of indirection while preserving composability.
 
-| Aspect                 | SNOBOL                                 | `sno`                                |
-| ---------------------- | -------------------------------------- | ------------------------------------ |
-| Pattern representation | First-class value (`pattern = LEN(4)`) | Ordinary function `(sno_len(&s, 4))` |
-| Matching               | Separate operation (`subject pattern`) | Immediate execution (function call)  |
-| Composition            | Concatenation / alternation operators  | Native C `&&` /  ||`                 |
-| State                  | Implicit cursor in pattern matcher     | Explicit cursor in `sno_subject_t`   |
-
-This eliminates SNOBOL's pattern compilation step while preserving its compositional elegance. You call pattern functions directly—no intermediate representation, no hidden engine.
-
-### The View: Cursor and Extraction Combined
-
-SNOBOL maintains an implicit cursor position during matching. To capture matched text, you must explicitly assign it using the `.VAR` operator *after* the match succeeds:
-
-```
-1
-```
-
-`sno` improves this model by unifying cursor and extraction into a single concept: the **view** (`sno_view_t`). After any successful pattern match, `s.view` is a half-open span `[begin, end)` that:
-
-1. Represents the current cursor position (`s.view.end` is where the next match begins)
-2. *Is* the extracted substring—no separate assignment step required
-
-```
-c
-
-
-
-
-
-
-
-
-
-
-
-
-
-1
-
-2
-
-3
-
-4
-```
-
-This design eliminates SNOBOL's two-step dance (match then assign). The view is both position and payload—zero-copy by default, with explicit extraction (`sno_var`) available only when null-termination is required by legacy APIs.
-
-### Expressive Power Without Backtracking
-
-Pattern functions operate at the intersection of Chomsky Type 3 (regular) and practical Type 2 (context-free) languages:
-
-- **Type 3**: Fixed-width fields (`sno_len`), character classes (`sno_span`, `sno_break`), and sequences compose naturally with `&&`/`||`.
-- **Practical Type 2**: The explicit cursor model enables helpers for balanced delimiters (parentheses, quotes) without regex-style backtracking.
-
-Critically, `sno` avoids regex's pitfalls:
-
-- ✅ No backtracking explosions—each primitive advances the cursor deterministically
-- ✅ No hidden state—the entire parser state is `s.view.end`
-- ✅ O(n) worst-case—pointer arithmetic only, no stack unwinding
-
-### The Primitive Contract
-
-All pattern functions share a simple contract:
-
-```
-c
-
-
-
-
-
-
-
-
-
-
-
-
-
-1
-```
-
-- **Success**: cursor (`s.view.end`) advances; `s.view` holds the exact matched span
-- **Failure**: cursor and view unchanged (enables safe `||` alternation)
-- **Composition**: chain with `&&` for sequences, `||` for alternatives
-
-These primitives form a minimal core—every higher-level parser (CSV, INI, log formats) is built by composing them with native C control flow. No macros. No DSL. Just functions that transform cursor state predictably, with extraction built in.
+The key innovation is the **view**: a half-open span `[begin, end)` that unifies cursor position and extraction. After any successful match, `s.view` *is* the matched substring—no separate assignment step required. The cursor for the next match is simply `s.view.end`. 
 
 ### 2.1`sno_bind` — Establish Subject String
 
