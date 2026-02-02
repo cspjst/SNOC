@@ -3,17 +3,16 @@
 
 void sno_bind(sno_subject_t* s, cstr_t* c) {
     if(s && c) {
-        s->str.begin = s->str.end = s->view.begin = s->view.end = c;
+        s->str.begin = s->str.end = s->view.begin = s->view.end = s->mark = c;
         while(*s->str.end++ != '\0');
         s->length = s->str.end - s->str.begin - 1;
     }
 }
 
-void sno_reset(sno_subject_t* s) {
-    if(s) {
-        s->view.begin = s->str.begin;
-        s->view.end = s->str.begin;  // cursor at start
-    }
+bool sno_reset(sno_subject_t* s) {
+    if (!s) return false;
+    s->view.begin = s->view.end = s->mark = s->str.begin;
+    return true;
 }
 
 bool sno_lit(sno_subject_t* s, char ch) {
@@ -74,11 +73,26 @@ bool sno_len_var(sno_subject_t* s, size_t n, char* buf, size_t buflen) {
     return false;
 }
 
-bool sno_ws(sno_subject_t* s) {
-   if (!s) return false;
-   sno_view_t saved = s->view;  // save current view state
-   if (sno_span(s, " \t\r\n")) return true;  // consumed 1+ whitespace → view already set correctly
-   // Zero whitespace present → succeed with empty span at current cursor
-   s->view.begin = s->view.end;  // [cursor, cursor)
-   return true;
+bool sno_mark(sno_subject_t* s) {
+    if (!s) return false;
+    s->mark = s->view.end;
+    return true;
+}
+
+bool sno_cap(sno_subject_t* s, char* buf, size_t buflen) {
+    if (!s || !buf || !buflen || !s->mark) return false;
+    size_t len = s->view.end - s->mark;
+    if (len >= buflen) return false;  // no room for null terminator
+    memcpy(buf, s->mark, len);
+    buf[len] = '\0';
+    return true;
+}
+
+bool sno_any(sno_subject_t* s, const char* set) {
+    if (!s || !set) return false;
+    cstr_t* pos = s->view.end;
+    if (!*pos || !strchr(set, *pos)) return false;  // not in set or at end
+    s->view.begin = pos;
+    s->view.end = pos + 1;
+    return true;
 }

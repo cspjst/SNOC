@@ -94,6 +94,7 @@ typedef struct {
 typedef struct {
     sno_view_t str;    /**< Full subject string [begin, end) including null terminator */
     sno_view_t view;   /**< Current match span [begin, end); cursor = view.end */
+    cstr_t* mark;      /**< capture start position */
     size_t length;     /**< Cached strlen (excluding null terminator) */
 } sno_subject_t;
 
@@ -108,13 +109,13 @@ typedef struct {
 void sno_bind(sno_subject_t* s, cstr_t* c);
 
 /**
- * @brief Reset cursor to start of subject string
+ * @brief Reset cursor and mark to start of subject string
  *
- * Sets s->view to empty span at beginning: [str.begin, str.begin)
+ * Sets s->view to empty span [str.begin, str.begin) and s->mark to str.begin.
  * @param s Parsing context (must not be NULL)
+ * @return true if reset succeeded; false if s is NULL
  */
-void sno_reset(sno_subject_t* s);
-
+bool sno_reset(sno_subject_t* s);
 /**
  * @brief Match single literal character at cursor
  *
@@ -187,80 +188,38 @@ bool sno_var(sno_subject_t* s, char* buf, size_t buflen);
 bool sno_len_var(sno_subject_t* s, size_t n, char* buf, size_t buflen);
 
 /**
- * @brief Match 0+ whitespace characters (space, tab, CR, LF)
+ * @brief Place capture mark at current cursor position
  *
- * Always succeeds (even with zero-length match). Advances cursor over
- * consecutive whitespace characters if present; otherwise leaves cursor
- * unchanged and sets view to empty span [cursor, cursor).
+ * Sets the capture start to the current cursor (s.view.end).
  * @param s Parsing context (must not be NULL)
- * @return true always (cursor advanced 0+ positions)
- * @note Whitespace set = " \t\r\n"
- * @note Zero-length success: view = [cursor, cursor) when no whitespace present
+ * @return true always (even at end of string)
+ * @note Default mark is start of subject (set by sno_bind/sno_reset)
  */
- bool sno_ws(sno_subject_t* s);
+bool sno_mark(sno_subject_t* s);
 
 /**
- * @brief Match 1+ whitespace characters
+ * @brief Extract text between mark and current cursor
  *
- * Requires at least one whitespace character. Fails at non-whitespace.
+ * Copies the span [mark, cursor) into buf with null termination.
  * @param s Parsing context (must not be NULL)
- * @return true if ≥1 whitespace matched; false otherwise (cursor unchanged)
- * @note Whitespace set = " \t\r\n"
+ * @param buf Destination buffer (must not be NULL)
+ * @param buflen Size of buf in bytes (must be > 0)
+ * @return true if copy succeeds (span length < buflen); false on overflow or NULL args
+ * @note Requires prior sno_mark() or relies on default mark=start of subject
  */
-static inline bool sno_ws1(sno_subject_t* s) {
-    return sno_span(s, " \t\r\n");
-}
+bool sno_cap(sno_subject_t* s, char* buf, size_t buflen);
 
 /**
- * @brief Match 1+ ASCII digits (0-9)
+ * @brief Match single character from set (SNOBOL ANY primitive)
  *
- * SNOBOL idiom: SPAN('0123456789')
+ * Matches exactly one character that appears in 'set'.
  * @param s Parsing context (must not be NULL)
- * @return true if ≥1 digit matched; false otherwise (cursor unchanged)
+ * @param set Null-terminated string of allowed characters (must not be NULL)
+ * @return true if character matched; false otherwise (cursor unchanged on failure)
+ * @note Fails at end of string or when current character not in set.
  */
-static inline bool sno_digits(sno_subject_t* s) {
-    return sno_span(s, "0123456789");
-}
+bool sno_any(sno_subject_t* s, const char* set);
 
-/**
- * @brief Match 1+ ASCII letters (A-Z, a-z)
- *
- * SNOBOL idiom: SPAN('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
- * @param s Parsing context (must not be NULL)
- * @return true if ≥1 letter matched; false otherwise (cursor unchanged)
- */
-static inline bool sno_alpha(sno_subject_t* s) {
-    return sno_span(s, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
-}
 
-/**
- * @brief Match 1+ alphanumeric characters (A-Z, a-z, 0-9, underscore)
- *
- * Includes underscore for identifier compatibility.
- * @param s Parsing context (must not be NULL)
- * @return true if ≥1 alnum char matched; false otherwise (cursor unchanged)
- */
-static inline bool sno_alnum(sno_subject_t* s) {
-    return sno_span(s, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_");
-}
 
 #endif
-
-
-/**
- * @brief Match everything until (but not including) delimiter character
- *
- * SNOBOL idiom: BREAK(delimiter)
- * @param s Parsing context (must not be NULL)
- * @param delim Single-character delimiter (e.g., ',', '=', '\n')
- * @return true always (even for empty match); false only on NULL args
- * @note Does not consume the delimiter—cursor stops before it.
- * @note Empty match succeeds when cursor starts at delimiter.
- */
- /*
-static inline bool sno_until(sno_subject_t* s, char delim) {
-    char set[2] = {' ', '\0'};
-    set[0] = delim;
-    return sno_break(s, set);
-}
-*/

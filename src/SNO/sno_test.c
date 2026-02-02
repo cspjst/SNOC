@@ -1,5 +1,6 @@
 /* sno_test.c */
 #include "sno.h"
+#include "sno_constants.h"
 #include <assert.h>
 #include <string.h>
 
@@ -139,50 +140,75 @@ void sno_test(void)
     assert(sno_len(&s, 2));
     assert(s.view.end == s.str.end - 1);     // consumed all (minus '\0')
 
-    /* === sno_ws / sno_ws1 === */
-    sno_bind(&s, "   text");
-    assert(sno_ws(&s));                      // matches "   "
-    assert(s.view.end - s.view.begin == 3);  // 3 spaces consumed
-    assert(sno_ws(&s));                      // empty match at 't' (still succeeds)
-    assert(s.view.begin == s.view.end);      // zero-length span at cursor
+    /* === sno_any === */
+    sno_bind(&s, "alpha");
+    assert(sno_any(&s, SNO_LETTERS));      // 'a' in letters
+    assert(s.view.end - s.view.begin == 1);
+    assert(sno_any(&s, SNO_LETTERS));      // 'l' in letters
+    assert(!sno_any(&s, SNO_DIGITS));      // 'p' not in digits → fail
+    assert(s.view.end == s.str.begin + 2); // cursor unchanged after failure
 
-    sno_bind(&s, "text");
-    assert(sno_ws(&s));                      // empty match at 't' (succeeds)
-    assert(s.view.begin == s.view.end);      // zero-length span
-    assert(!sno_ws1(&s));                    // requires ≥1 whitespace → fails
-    assert(s.view.begin == s.view.end);      // cursor unchanged on failure
+    sno_bind(&s, "42");
+    assert(!sno_any(&s, SNO_LETTERS));     // '4' not in letters → fail
+    assert(s.view.begin == s.view.end);    // empty view (cursor at start)
 
-    sno_bind(&s, "  text");
-    assert(sno_ws1(&s));                     // matches "  "
-    assert(s.view.end - s.view.begin == 2);
+    sno_bind(&s, "");
+    assert(!sno_any(&s, SNO_LETTERS));     // empty string → fail
 
-    /* === sno_digits === */
-    sno_bind(&s, "123abc");
-    assert(sno_digits(&s));
-    assert(s.view.end - s.view.begin == 3);  // "123"
+    /* === sno_mark / sno_cap === */
 
-    assert(!sno_digits(&s));                 // fails at 'a'
-    assert(s.view.end - s.view.begin == 3);  // view UNCHANGED (still "123")
-    assert(s.view.end == s.str.begin + 3);   // cursor unchanged
+    /* Test 1: Default mark = start of subject after sno_bind */
+    sno_bind(&s, "hello");
+    assert(s.mark == s.str.begin);          /* mark at start */
+    assert(sno_cap(&s, buf, sizeof(buf)));  /* capture empty span */
+    assert(strcmp(buf, "") == 0);           /* → "" */
 
-    /* === sno_alpha === */
-    sno_bind(&s, "abc123");
-    assert(sno_alpha(&s));
-    assert(s.view.end - s.view.begin == 3);  // "abc"
+    /* Test 2: Mark at start, capture after matching */
+    sno_bind(&s, "alpha=42");
+    sno_mark(&s);                           /* mark = "alpha=42" */
+    assert(s.mark == s.str.begin);
+    assert(sno_span(&s, SNO_LETTERS));      /* match "alpha" */
+    assert(sno_cap(&s, buf, sizeof(buf)));
+    assert(strcmp(buf, "alpha") == 0);      /* → "alpha" */
 
-    /* === sno_alnum === */
-    sno_bind(&s, "a1b2c3!");
-    assert(sno_alnum(&s));
-    assert(s.view.end - s.view.begin == 6);  // "a1b2c3"
-
-    /* === sno_until === */
+    /* Test 3: Mark mid-string, capture remainder */
     sno_bind(&s, "key=value");
-    assert(sno_until(&s, '='));
-    assert(s.view.end - s.view.begin == 3);  // "key"
-    assert(sno_lit(&s, '='));                // cursor stopped BEFORE '='
+    assert(sno_len(&s, 4));                 /* match "key=" */
+    sno_mark(&s);                           /* mark = "value" */
+    assert(sno_break(&s, "\r\n"));          /* match "value" */
+    assert(sno_cap(&s, buf, sizeof(buf)));
+    assert(strcmp(buf, "value") == 0);      /* → "value" */
 
-    sno_bind(&s, "=value");                  // empty match at delimiter
-    assert(sno_until(&s, '='));
-    assert(s.view.begin == s.view.end);      // zero-length span
-    assert(sno_lit(&s, '='));                // consumes the '='
+    /* Test 4: Empty capture (mark == cursor) */
+    sno_bind(&s, "text");
+    sno_mark(&s);                           /* mark = "text" */
+    assert(sno_cap(&s, buf, sizeof(buf)));  /* capture zero-length span */
+    assert(strcmp(buf, "") == 0);           /* → "" */
+
+    /* Test 5: Buffer overflow fails safely */
+    sno_bind(&s, "longtext");
+    sno_mark(&s);
+    assert(sno_len(&s, 8));                 /* match "longtext" */
+    assert(!sno_cap(&s, buf, 5));           /* buf too small (needs 9) */
+    assert(s.mark == s.str.begin);          /* mark unchanged after failure */
+    assert(s.view.end == s.str.begin + 8);  /* cursor unchanged after failure */
+
+    /* Test 6: sno_reset restores mark to start */
+    sno_bind(&s, "resetme");
+    assert(sno_len(&s, 3));                 /* match "res" */
+    sno_mark(&s);                           /* mark = "etme" */
+    sno_reset(&s);                          /* reset cursor AND mark */
+    assert(s.mark == s.str.begin);          /* mark back to start */
+    assert(s.view.end == s.str.begin);      /* cursor back to start */
+    assert(sno_cap(&s, buf, sizeof(buf)));  /* capture empty */
+    assert(strcmp(buf, "") == 0);
+
+    /* Test 7: Full identifier capture (real-world usage) */
+    sno_bind(&s, "count=42");
+    sno_mark(&s);
+    assert(sno_any(&s, SNO_LETTERS));
+    assert(sno_span(&s, SNO_ALNUM_U));
+    assert(sno_cap(&s, buf, sizeof(buf)));
+    assert(strcmp(buf, "count") == 0);      /* → "count" (not "ount") */
+
 }
