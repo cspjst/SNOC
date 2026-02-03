@@ -8,6 +8,10 @@ SNOBOL4 patterns are more powerful than regular expressions (Chomsky Type-3) and
 
 A pattern matching that is, IMHO,  more powerful and intuitive to use in C programming than regular expressions.
 
+## 1.1 Design Decisions
+
+sno has no backtracking engine—pattern composition with &&/|| provides explicit, predictable control flow without hidden state unwinding.
+
 ## 2. Patterns and Pattern Functions
 
 ### Patterns Are Functions
