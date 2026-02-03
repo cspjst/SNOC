@@ -4,8 +4,7 @@
 #include <assert.h>
 #include <string.h>
 
-void sno_test(void)
-{
+void sno_test(void) {
     sno_subject_t s = {0};
     char buf[64];
 
@@ -155,7 +154,7 @@ void sno_test(void)
     sno_bind(&s, "");
     assert(!sno_any(&s, SNO_LETTERS));     // empty string → fail
 
-    /* === sno_mark / sno_cap === */
+    /* sno_mark / sno_cap */
 
     /* Test 1: Default mark = start of subject after sno_bind */
     sno_bind(&s, "hello");
@@ -209,6 +208,6 @@ void sno_test(void)
     assert(sno_any(&s, SNO_LETTERS));
     assert(sno_span(&s, SNO_ALNUM_U));
     assert(sno_cap(&s, buf, sizeof(buf)));
-    assert(strcmp(buf, "count") == 0);      /* → "count" (not "ount") */
+    assert(strcmp(buf, "count") == 0);      /* gives "count" (not "ount") */
 
 }
