@@ -210,4 +210,26 @@ void sno_test(void) {
     assert(sno_cap(&s, buf, sizeof(buf)));
     assert(strcmp(buf, "count") == 0);      /* gives "count" (not "ount") */
 
+    /* sno_notany */
+    sno_bind(&s, "42alpha");
+    assert(sno_notany(&s, SNO_LETTERS));   // '4' not in letters → success
+    assert(s.view.end - s.view.begin == 1);
+    assert(sno_notany(&s, SNO_LETTERS));   // '2' not in letters → success
+    assert(!sno_notany(&s, SNO_LETTERS));  // 'a' IS in letters → fail
+    assert(s.view.end == s.str.begin + 2); // cursor unchanged after failure
+    
+    sno_bind(&s, "alpha");
+    assert(!sno_notany(&s, SNO_LETTERS));  // 'a' in letters → fail immediately
+    assert(s.view.begin == s.view.end);    // empty view (cursor at start)
+    
+    sno_bind(&s, "");
+    assert(!sno_notany(&s, SNO_LETTERS));  // empty string → fail
+    
+    /* NOTANY vs ANY complement test */
+    sno_bind(&s, "a1b2");
+    assert(sno_any(&s, SNO_LETTERS));      // 'a' in letters
+    assert(sno_notany(&s, SNO_LETTERS));   // '1' not in letters
+    assert(sno_any(&s, SNO_LETTERS));      // 'b' in letters
+    assert(sno_notany(&s, SNO_LETTERS));   // '2' not in letters
+
 }
