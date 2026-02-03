@@ -220,6 +220,18 @@ bool sno_cap(sno_subject_t* s, char* buf, size_t buflen);
  */
 bool sno_any(sno_subject_t* s, const char* set);
 
+/**
+ * @brief Match single character NOT in set (SNOBOL NOTANY primitive)
+ *
+ * Matches exactly one character that does NOT appear in 'set'.
+ * @param s Parsing context (must not be NULL)
+ * @param set Null-terminated string of excluded characters (must not be NULL)
+ * @return true if character matched; false otherwise (cursor unchanged on failure)
+ * @note Fails at end of string or when current character IS in set.
+ * @see sno_any
+ */
+bool sno_notany(sno_subject_t* s, const char* set);
+
 
 
 #endif
