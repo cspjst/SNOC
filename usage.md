@@ -4,6 +4,10 @@
 
 Importing the practical discrete recognition systems from SNOBOL4 into C for powerful string handling and parsing whilst maintaing C idioms.
 
+SNOBOL4 patterns are more powerful than regular expressions (Chomsky Type-3) and can express context-free grammars (Chomsky Type-2) and converting them to C functions unlocks the same pattern matching power. 
+
+A pattern matching that is, IMHO,  more powerful and intuitive to use in C programming than regular expressions.
+
 ## 2. Patterns and Pattern Functions
 
 ### Patterns Are Functions
