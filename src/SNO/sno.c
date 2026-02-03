@@ -96,3 +96,12 @@ bool sno_any(sno_subject_t* s, const char* set) {
     s->view.end = pos + 1;
     return true;
 }
+
+bool sno_notany(sno_subject_t* s, const char* set) {
+    if (!s || !set) return false;
+    cstr_t* pos = s->view.end;
+    if (!*pos || strchr(set, *pos)) return false;  // end of string OR char in set
+    s->view.begin = pos;
+    s->view.end = pos + 1;
+    return true;
+}
