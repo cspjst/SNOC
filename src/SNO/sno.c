@@ -1,6 +1,9 @@
 #include "sno.h"
 #include <string.h>
 
+/* Roll back cursor and view to pos on failure; preserves failure contract (cursor unchanged) */
+#define sno_rollback(s, pos) ((s) ? ((s)->view.end = (pos), (s)->view.begin = (pos), false) : false)
+
 void sno_bind(sno_subject_t* s, cstr_t* c) {
     if(s && c) {
         s->str.begin = s->str.end = s->view.begin = s->view.end = s->mark = c;
@@ -133,3 +136,24 @@ bool sno_rem(sno_subject_t* s) {
     return true;
 }
 
+bool sno_bal(sno_subject_t* s, char open, char close) {
+    if (!s) return false;
+    
+    cstr_t* start = s->view.end;
+    char delim[3] = {open, close, '\0'};
+    
+    if (!sno_lit(s, open)) return false;     /* Match opening delimiter */
+    
+    while (*s->view.end && *s->view.end != close) {    /* Consume balanced interior */    
+        if (*s->view.end == open) {
+            if (!sno_bal(s, open, close)) return sno_rollback(s, start);
+        } else {
+            if (!sno_notany(s, delim)) return sno_rollback(s, start);
+        }
+    }
+    
+    if (!sno_lit(s, close)) return sno_rollback(s, start);    /* Match closing delimiter */
+
+    s->view.begin = start; /* Success: view spans entire balanced expression INCLUDING delimiters */
+    return true;
+}
