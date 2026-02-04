@@ -409,7 +409,7 @@ extension=.txt
 `sno_rtab(0)` is equivalent to `sno_rem`—match everything to the end.
 
 
-### 2.11 `sno_rem` — Match Remainder To End
+### 2.13 `sno_rem` — Match Remainder To End
 
 `sno_rem(s)` matches all characters from current cursor to end of string.
 
