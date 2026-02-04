@@ -8,9 +8,33 @@ SNOBOL4 patterns are more powerful than regular expressions (Chomsky Type-3) and
 
 A pattern matching that is, IMHO,  more powerful and intuitive to use in C programming than regular expressions.
 
+
 ## 1.1 Design Decisions
 
-sno has no backtracking engine—pattern composition with &&/|| provides explicit, predictable control flow without hidden state unwinding.
+SNOBOL4 pattern matching employs an implicit backtracking scanner. Upon failure, the scanner rewinds the cursor and explores alternative paths through the pattern structure. This mechanism simplifies expression of ambiguous grammars but introduces hidden state: the parser maintains a stack of partial matches invisible to the programmer.
+
+The `sno` library omits backtracking entirely. Pattern composition relies on C's native control flow operators—`&&` for sequencing, `||` for alternation—with explicit cursor state maintained in `s.view.end`. Each primitive either advances the cursor (success) or leaves it unchanged (failure). No automatic rollback occurs.
+
+This design yields three observable properties:
+
+1.  **State visibility** — The entire parser state is the cursor position. A debugger shows exactly where matching stopped.
+2.  **Predictable failure** — Failed alternatives never corrupt cursor position. The next `||` branch retries from the original position.
+3.  **Linear performance** — Each character is examined at most once. Catastrophic backtracking (as in regex `(a+)+b` on long non‑matching inputs) cannot occur.
+
+Context‑free recognition remains possible through explicit recursion in user code rather than implicit engine behavior. For example, balanced parentheses:
+``` C
+bool parens(sno_subject_t* s) {
+    while (sno_lit(s, '(')) {
+        if (!parens(s) || !sno_lit(s, ')')) return false;
+    }
+    return true;
+}
+```
+The trade‑off is deliberate: `sno` requires the programmer to structure alternatives explicitly, but in return provides deterministic behavior and trivial debugging. This aligns with C's philosophy of visible state and minimal runtime machinery.
+
+N.B. The omission of backtracking is not a limitation—it is the foundation of the library's utility.
+
+
 
 ## 2. Patterns and Pattern Functions
 
@@ -442,4 +466,57 @@ if (sno_span(&s, SNO_ALNUM_U) &&         /* match "host" */
 host = alpha.beta.gamma
 ```
 `sno_rem` is the endpoint for line-oriented parsing—consume everything that remains without counting characters.
+
+
+### 2.14 `sno_at` / `sno_at_r` — Cursor Position Predicates
+
+`sno_at(s, n)` and `sno_at_r(s, n)` test cursor position without advancing state.
+
+-   **`sno_at`**: succeeds if cursor is at absolute offset `n` (0-indexed from start)
+-   **`sno_at_r`**: succeeds if cursor is at offset `length - n` (leaving `n` characters at end)
+-   **Never move cursor** — pure predicates for validation/assertion
+-   **Return boolean** — composable with `&&` after pattern matches
+
+Use these to enforce column constraints or validate parse boundaries—exactly like SNOBOL's PCS/RPOS, but expressed idiomatically in C.
+
+###### Example — Fixed-Width Field Validation
+``` C
+sno_subject_t s = {0};
+char year[5], month[6];
+
+sno_bind(&s, "1290 SEP. 27 CHINA, CHIHLI");
+
+/* Year must occupy columns 0-3 */
+sno_mark(&s);
+if (sno_len(&s, 4) && sno_at(&s, 4) && sno_cap(&s, year, sizeof(year))) {
+    printf("year=%s\n", year);          /* → year=1290 */
+}
+
+/* Skip to month field (columns 5-8) */
+sno_tab(&s, 5);
+sno_mark(&s);
+if (sno_len(&s, 4) && sno_at(&s, 9) && sno_cap(&s, month, sizeof(month))) {
+    printf("month=%s\n", month);        /* → month=SEP. */
+}
+```
+###### Output:
+```
+year=1290
+month=SEP.
+```
+The `sno_at` checks act as **guard rails**—if a field overruns its column boundary, the entire pattern fails cleanly.
+
+###### Example — Assert End of Line
+``` C
+sno_bind(&s, "host=alpha");
+if (sno_span(&s, SNO_ALNUM_U) &&
+    sno_lit(&s, '=') &&
+    sno_rem(&s) &&
+    sno_at_r(&s, 0))                    /* cursor at end → valid line */
+{
+    printf("valid assignment\n");
+}
+```
+`sno_at_r(s, 0)` is the way to assert "consumed the entire line"—critical for line-oriented parsers that must reject trailing garbage.
+
 
