@@ -105,3 +105,31 @@ bool sno_notany(sno_subject_t* s, const char* set) {
     s->view.end = pos + 1;
     return true;
 }
+
+bool sno_tab(sno_subject_t* s, size_t n) {
+    if (!s) return false;
+    size_t cur = s->view.end - s->str.begin;
+    if (n < cur || n > s->length) return false;  // leftward move or beyond end → fail
+    s->view.begin = s->view.end;
+    s->view.end = s->str.begin + n;
+    return true;
+}
+
+
+bool sno_rtab(sno_subject_t* s, size_t n) {
+    if (!s || n > s->length) return false;       // n > length would position before start
+    size_t cur = s->view.end - s->str.begin;
+    size_t target = s->length - n;
+    if (target < cur) return false;              // leftward move → fail
+    s->view.begin = s->view.end;
+    s->view.end = s->str.begin + target;
+    return true;
+}
+
+bool sno_rem(sno_subject_t* s) {
+    if (!s) return false;
+    s->view.begin = s->view.end;
+    s->view.end = s->str.end - 1;                // before null terminator
+    return true;
+}
+
