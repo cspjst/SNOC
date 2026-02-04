@@ -262,4 +262,32 @@ bool sno_rtab(sno_subject_t* s, size_t n);
  */
 bool sno_rem(sno_subject_t* s);
 
+/* === Position Assertions (Optional Predicates) === */
+
+/**
+ * @brief Test if cursor is at absolute offset n (0-indexed)
+ *
+ * Returns true if current cursor position equals offset n from subject start.
+ * Does NOT advance cursor—pure predicate for validation.
+ * @param s Parsing context (must not be NULL)
+ * @param n Absolute offset (0 = start, length = end)
+ * @return true if cursor at offset n; false otherwise or if s is NULL
+ * @note Use for post-match validation: if (pattern && sno_at(s, 10)) { ... }
+ */
+#define sno_at(s, n) ((s) && (size_t)((s)->view.end - (s)->str.begin) == (n))
+
+/**
+ * @brief Test if cursor is at offset (length - n) from right end
+ *
+ * Returns true if current cursor position equals (length - n).
+ * Does NOT advance cursor—pure predicate for validation.
+ * @param s Parsing context (must not be NULL)
+ * @param n Number of characters remaining after cursor (0 = at end)
+ * @return true if cursor at (length - n); false otherwise or if s is NULL
+ * @note sno_at_r(s, 0) tests "cursor at end of string"
+ */
+#define sno_at_r(s, n) ((s) && (size_t)((s)->view.end - (s)->str.begin) == (s)->length - (n))
+
+
+
 #endif
