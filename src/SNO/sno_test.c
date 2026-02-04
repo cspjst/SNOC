@@ -232,4 +232,43 @@ void sno_test(void) {
     assert(sno_any(&s, SNO_LETTERS));      // 'b' in letters
     assert(sno_notany(&s, SNO_LETTERS));   // '2' not in letters
 
+    /* sno_tab / sno_rtab / sno_rem */
+
+    /* TAB: absolute positioning forward only */
+    sno_bind(&s, "SNOBOL4");
+    assert(sno_len(&s, 2));                        // "SN" → cursor at offset 2
+    assert(sno_tab(&s, 6));                        // TAB(6): match "OBOL" to offset 6
+    assert(s.view.end - s.view.begin == 4);
+    assert(memcmp(s.view.begin, "OBOL", 4) == 0);
+    assert(s.view.end == s.str.begin + 6);
+    
+    /* TAB failure: leftward move */
+    sno_bind(&s, "text");
+    assert(sno_len(&s, 3));                        // cursor at offset 3
+    assert(!sno_tab(&s, 2));                       // cannot move left to offset 2
+    assert(s.view.end == s.str.begin + 3);         // cursor unchanged
+    
+    /* RTAB: positioning from right */
+    sno_bind(&s, "SNOBOL4");                       // length = 7
+    assert(sno_len(&s, 2));                        // "SN" → offset 2
+    assert(sno_rtab(&s, 1));                       // RTAB(1): to offset 6 (7-1)
+    assert(s.view.end - s.view.begin == 4);
+    assert(memcmp(s.view.begin, "OBOL", 4) == 0);
+    
+    /* REM: match to end */
+    sno_bind(&s, "host=alpha");
+    assert(sno_len(&s, 5));                        // skip "host="
+    assert(sno_rem(&s));                           // match "alpha"
+    assert(strcmp(s.view.begin, "alpha") == 0);
+    
+    /* Zero-length success cases */
+    sno_bind(&s, "text");
+    assert(sno_tab(&s, 0));                        // TAB(0) at start → empty match
+    assert(s.view.begin == s.view.end);
+    
+    sno_bind(&s, "text");
+    assert(sno_len(&s, 4));                        // cursor at end
+    assert(sno_rem(&s));                           // REM at end → empty match
+assert(s.view.begin == s.view.end);
+
 }
