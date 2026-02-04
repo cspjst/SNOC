@@ -311,3 +311,38 @@ identifier=count
 ```
 
 Unlike `sno_span`, `sno_any` guarantees exactly one character match—making it the correct choice for "starts with" constraints in identifier grammars.
+
+
+### 2.10 `sno_notany` — Match Single Character Not In Set
+
+`sno_notany(s, set)` matches exactly one character that does **not** appear in `set`.
+
+-   **Success**: cursor advances by one; `s.view` becomes the matched character — returns `true`
+-   **Failure**: cursor and view unchanged (character in set or end of string) — returns `false`
+
+The precise complement of `sno_any`—ideal for skipping delimiters, detecting field boundaries, or matching "anything except" constraints.
+
+###### Example — Skip Non-Identifiers Until Letter
+``` C
+sno_subject_t s = {0};
+char id[32];
+
+sno_bind(&s, "42_count=42");
+/* Skip leading non-letters (digits, underscore) */
+while (sno_notany(&s, SNO_LETTERS)) {
+    /* consumes '4', '2', '_' */
+}
+/* Now at first letter 'c' */
+sno_mark(&s);
+if (sno_any(&s, SNO_LETTERS) && 
+    sno_span(&s, SNO_ALNUM_U) &&
+    sno_cap(&s, id, sizeof(id)))
+{
+    printf("identifier=%s\n", id);
+}
+```
+###### Output:
+```
+identifier=count
+```
+`sno_notany` provides the "negated character class" capability that regex expresses as `[^a-z]`—but with explicit cursor advancement and no hidden scanning behavior. Perfect for controlled tokenization where you need to consume "everything until X" without overshooting.
