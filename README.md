@@ -379,5 +379,67 @@ printf("%s %s\n", year, city);
 ```
 1290 CHINA
 ```
+`sno_tab` provides SNOBOL's columnar parsing power—without hidden state or scanning. The matched span is available immediately in `s.view` for zero-copy access or extraction via `sno_cap`.
+### 2.12 `sno_rtab` — Position From Right End
 
+`sno_rtab(s, n)` moves the cursor to offset `length - n` (leaving `n` characters at the end).
+
+-   **Success**: cursor advances to `length - n`; `s.view` spans `[old, length-n)` — returns `true`
+-   **Failure**: returns `false` if target position < current position; cursor unchanged
+
+Useful for skipping prefixes when the suffix length is known (e.g., "everything except last 4 chars").
+
+###### Example — Skip Prefix, Keep Suffix
+``` C
+sno_subject_t s = {0};
+char suffix[5];
+
+sno_bind(&s, "filename.txt");
+sno_rtab(&s, 4);                         /* cursor → before ".txt" */
+sno_mark(&s);
+sno_rem(&s);                             /* match ".txt" */
+sno_cap(&s, suffix, sizeof(suffix));    /* suffix = ".txt" */
+
+printf("extension=%s\n", suffix);
+```
+###### Output:
+```
+extension=.txt
+```
+`sno_rtab(0)` is equivalent to `sno_rem`—match everything to the end.
+
+
+### 2.11 `sno_rem` — Match Remainder To End
+
+`sno_rem(s)` matches all characters from current cursor to end of string.
+
+-   **Success**: cursor advances to end; `s.view` spans `[old, end)` — returns `true`
+-   **Failure**: never fails (always succeeds even with zero-length match)
+
+The simplest way to consume the rest of a line or field—no length calculation required.
+
+###### Example — Parse Key=Value to End of Line
+``` C
+sno_subject_t s = {0};
+char key[16], val[64];
+
+sno_bind(&s, "host=alpha.beta.gamma");
+sno_mark(&s);
+if (sno_span(&s, SNO_ALNUM_U) &&         /* match "host" */
+    sno_lit(&s, '=') &&
+    sno_rem(&s) &&                       /* match "alpha.beta.gamma" */
+    sno_cap(&s, val, sizeof(val)) &&
+    sno_reset(&s) &&
+    sno_mark(&s) &&
+    sno_span(&s, SNO_ALNUM_U) &&
+    sno_cap(&s, key, sizeof(key)))
+{
+    printf("%s = %s\n", key, val);
+}
+```
+###### Output:
+```
+host = alpha.beta.gamma
+```
+`sno_rem` is the endpoint for line-oriented parsing—consume everything that remains without counting characters.
 
