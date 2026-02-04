@@ -294,4 +294,68 @@ void sno_test(void) {
     assert(!sno_at(NULL, 0));
     assert(!sno_at_r(NULL, 0));
 
+    /* sno_bal */
+
+    /* Basic balanced pair */
+    sno_bind(&s, "(A)");
+    assert(sno_bal(&s, '(', ')'));
+    assert(memcmp(s.view.begin, "(A)", 3) == 0);
+    assert(s.view.end - s.view.begin == 3);
+    
+    /* Nested balanced expression */
+    sno_bind(&s, "(B(C)D)");
+    assert(sno_bal(&s, '(', ')'));
+    assert(memcmp(s.view.begin, "(B(C)D)", 7) == 0);
+    assert(s.view.end - s.view.begin == 7);
+    
+    /* Empty parens (nonnull balanced string) */
+    sno_bind(&s, "()");
+    assert(sno_bal(&s, '(', ')'));
+    assert(memcmp(s.view.begin, "()", 2) == 0);
+    
+    /* Adjacent balanced pairs — BAL matches FIRST pair only */
+    sno_bind(&s, "()()");
+    assert(sno_bal(&s, '(', ')'));
+    assert(memcmp(s.view.begin, "()", 2) == 0);
+    assert(s.view.end == s.str.begin + 2);  /* cursor after first pair */
+    
+    /* Different delimiter pairs */
+    sno_bind(&s, "[X]");
+    assert(sno_bal(&s, '[', ']'));
+    assert(memcmp(s.view.begin, "[X]", 3) == 0);
+    
+    sno_bind(&s, "{Y{Z}W}");
+    assert(sno_bal(&s, '{', '}'));
+    assert(memcmp(s.view.begin, "{Y{Z}W}", 7) == 0);
+    
+    /* Failure: no opening delimiter */
+    sno_bind(&s, "text");
+    assert(!sno_bal(&s, '(', ')'));
+    assert(s.view.begin == s.view.end);
+    
+    /* Failure: unmatched close */
+    sno_bind(&s, ")");
+    assert(!sno_bal(&s, '(', ')'));
+    
+    /* Failure: unclosed open */
+    sno_bind(&s, "(unclosed");
+    assert(!sno_bal(&s, '(', ')'));
+    
+    /* Failure: mismatched nesting */
+    sno_bind(&s, "((A)");
+    assert(!sno_bal(&s, '(', ')'));
+    
+    /* Real-world: extract interior of balanced expression */
+    sno_bind(&s, "A(B(C)D)E");
+    assert(sno_lit(&s, 'A'));
+    assert(sno_lit(&s, '('));          /* match opening paren */
+    sno_mark(&s);                      /* mark start of interior */
+    /* Parse interior: B + (C) + D */
+    assert(sno_notany(&s, "()") || sno_bal(&s, '(', ')'));  /* B */
+    assert(sno_notany(&s, "()") || sno_bal(&s, '(', ')'));  /* (C) */
+    assert(sno_notany(&s, "()") || sno_bal(&s, '(', ')'));  /* D */
+    assert(sno_lit(&s, ')'));          /* match closing paren */
+    assert(sno_cap(&s, buf, sizeof(buf)));
+    assert(strcmp(buf, "B(C)D") == 0);
+
 }
