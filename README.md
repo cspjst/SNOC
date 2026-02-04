@@ -573,3 +573,41 @@ if (sno_span(&s, SNO_ALNUM_U) &&
 `sno_at_r(s, 0)` is the way to assert "consumed the entire line"—critical for line-oriented parsers that must reject trailing garbage.
 
 
+### 2.15 `sno_bal` — Match Balanced Delimiters
+
+`sno_bal(s, open, close)` matches a nonnull string balanced with respect to delimiter pair `open`/`close`.
+
+-   **Success**: cursor advances over entire balanced expression **including** outer delimiters; `s.view` spans full expression — returns `true`
+-   **Failure**: cursor unchanged; returns `false` if opening delimiter absent or expression unbalanced (mismatched/unclosed delimiters)
+
+Validates nesting deterministically through explicit recursion—no backtracking required. Matches exactly one balanced expression (adjacent pairs require repeated calls).
+
+N.B.`sno_bal(s, open, close)` generalizes SNOBOL's hardcoded `()` to arbitrary delimiter pairs while preserving deterministic semantics.
+
+**WARNING!** **Recursion depth** — pathological inputs (`(((...)))` with 10⁶ nesting) may exhaust the stack! (typical parsers rarely exceed hundreds of nesting levels)
+
+###### Example — Parse Nested Expression Interior
+``` C
+sno_subject_t s = {0};
+char expr[64];
+
+sno_bind(&s, "A(B(C)D)E");
+sno_mark(&s);
+if (sno_lit(&s, 'A') &&
+    sno_bal(&s, '(', ')') &&          /* matches "(B(C)D)" */
+    sno_lit(&s, 'E') &&
+    sno_cap(&s, expr, sizeof(expr)))
+{
+    printf("inner=%s\n", expr);       /* → inner=(B(C)D) */
+}
+```
+###### Output:
+```
+inner=(B(C)D)
+```
+Demonstrates that context‑free recognition does not require backtracking. The recursive descent algorithm:
+
+1.  Advances cursor deterministically
+2.  Maintains visible state (`s.view.end`)
+3.  Fails fast on imbalance (no hidden stack unwinding)
+
