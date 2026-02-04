@@ -346,3 +346,38 @@ if (sno_any(&s, SNO_LETTERS) &&
 identifier=count
 ```
 `sno_notany` provides the "negated character class" capability that regex expresses as `[^a-z]`—but with explicit cursor advancement and no hidden scanning behavior. Perfect for controlled tokenization where you need to consume "everything until X" without overshooting.
+
+
+### 2.11 `sno_tab` — Absolute Cursor Positioning
+
+`sno_tab(s, n)` moves the cursor to absolute offset `n` (0-indexed from start of string).
+
+-   **Success**: cursor advances to offset `n`; `s.view` spans `[old, n)` — returns `true`
+-   **Failure**: returns `false` if `n < current position` (leftward move) or `n > length`; cursor unchanged
+
+Positions the cursor at a fixed column—ideal for fixed-width field extraction where field boundaries are known offsets.
+
+###### Example — Extract Fixed-Width Fields
+``` C
+sno_subject_t s = {0};
+char year[5], city[32];
+
+sno_bind(&s, "1290 SEP. 27 CHINA, CHIHLI");
+/* Extract year (positions 0-3) */
+sno_tab(&s, 4);                          /* cursor → after "1290" */
+sno_cap(&s, year, sizeof(year));        /* year = "1290" */
+
+/* Skip to city field (position 14) */
+sno_tab(&s, 14);                         /* cursor → after "SEP. 27 " */
+sno_mark(&s);
+sno_break(&s, ",");                      /* match "CHINA" */
+sno_cap(&s, city, sizeof(city));        /* city = "CHINA" */
+
+printf("%s %s\n", year, city);
+```
+###### Output:
+```
+1290 CHINA
+```
+
+
