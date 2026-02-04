@@ -232,6 +232,34 @@ bool sno_any(sno_subject_t* s, const char* set);
  */
 bool sno_notany(sno_subject_t* s, const char* set);
 
+/**
+ * @brief Move cursor to absolute position (SNOBOL TAB primitive)
+ *
+ * Matches all characters from current cursor to offset n (0-indexed).
+ * @param s Parsing context (must not be NULL)
+ * @param n Absolute offset from start (0 = start, length = end)
+ * @return true if n >= current position and n <= length; false otherwise
+ * @note Fails (no cursor movement) if n < current position (cannot move left)
+ */
+bool sno_tab(sno_subject_t* s, size_t n);
+/**
+ * @brief Move cursor to position from right end (SNOBOL RTAB primitive)
+ *
+ * Matches all characters from current cursor to offset (length - n).
+ * @param s Parsing context (must not be NULL)
+ * @param n Number of characters to leave at end (0 = match to end)
+ * @return true if (length - n) >= current position; false otherwise
+ * @note RTAB(0) matches remainder of string (same as sno_rem)
+ */
+bool sno_rtab(sno_subject_t* s, size_t n);
 
+/**
+ * @brief Match remainder of string to end (SNOBOL REM primitive)
+ *
+ * Equivalent to RTAB(0) — matches all characters from cursor to end.
+ * @param s Parsing context (must not be NULL)
+ * @return true always (even zero-length match at end)
+ */
+bool sno_rem(sno_subject_t* s);
 
 #endif
