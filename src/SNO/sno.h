@@ -288,6 +288,22 @@ bool sno_rem(sno_subject_t* s);
  */
 #define sno_at_r(s, n) ((s) && (size_t)((s)->view.end - (s)->str.begin) == (s)->length - (n))
 
-
+/**
+ * @brief Match balanced delimiters (SNOBOL BAL primitive generalized)
+ *
+ * Matches a nonnull string balanced with respect to delimiter pair (open, close).
+ * Validates nesting deterministically through explicit recursion—no backtracking.
+ * The matched span includes outer delimiters (e.g., "(A)" not "A").
+ *
+ * @param s Parsing context (must not be NULL)
+ * @param open Opening delimiter character (e.g., '(', '[', '{')
+ * @param close Closing delimiter character (e.g., ')', ']', '}')
+ * @return true if balanced expression matched (cursor advanced); false otherwise (cursor unchanged)
+ * @note Fails on: missing opening delimiter, unclosed opens, mismatched nesting, or EOF before close
+ * @note Generalizes SNOBOL's hardcoded BAL (parentheses-only) to arbitrary delimiter pairs
+ * @note Every failure path rolls back cursor completely via sno_rollback—preserves failure contract
+ * @see sno_notany for consuming non-delimiter characters within balanced content
+ */
+bool sno_bal(sno_subject_t* s, char open, char close);
 
 #endif
