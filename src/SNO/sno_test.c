@@ -269,6 +269,29 @@ void sno_test(void) {
     sno_bind(&s, "text");
     assert(sno_len(&s, 4));                        // cursor at end
     assert(sno_rem(&s));                           // REM at end → empty match
-assert(s.view.begin == s.view.end);
+    assert(s.view.begin == s.view.end);
+
+    /* sno_at / sno_at_r (position predicates) */
+
+    sno_bind(&s, "0123456789");
+    assert(sno_len(&s, 4));                  // cursor at offset 4 ("456789")
+    assert(sno_at(&s, 4));                   // at column 4 → true
+    assert(!sno_at(&s, 5));                  // not at column 5 → false
+    assert(sno_at_r(&s, 6));                 // 6 chars remain → true
+    assert(!sno_at_r(&s, 5));                // not 5 chars remaining → false
+    
+    /* Composition with pattern functions */
+    sno_bind(&s, "host=alpha");
+    assert(sno_len(&s, 4) && sno_at(&s, 4)); // "host" lands at offset 4
+    assert(sno_lit(&s, '=') && sno_at(&s, 5)); // '=' lands at offset 5
+    
+    /* End-of-string test */
+    sno_bind(&s, "text");
+    assert(sno_rem(&s) && sno_at_r(&s, 0));  // REM lands at end → 0 chars remaining
+    assert(sno_at(&s, 4));                   // length=4 → at offset 4
+    
+    /* NULL safety */
+    assert(!sno_at(NULL, 0));
+    assert(!sno_at_r(NULL, 0));
 
 }
