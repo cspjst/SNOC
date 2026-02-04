@@ -32,9 +32,62 @@ bool parens(sno_subject_t* s) {
 ```
 The trade‑off is deliberate: `sno` requires the programmer to structure alternatives explicitly, but in return provides deterministic behavior and trivial debugging. This aligns with C's philosophy of visible state and minimal runtime machinery.
 
-N.B. The omission of backtracking is not a limitation—it is the foundation of the library's utility.
 
+## 1.2 Subject, View, and Extraction
 
+The subject string is an immutable null‑terminated character array bound to a parsing context with `sno_bind`. No copies are made; all matching occurs in place against the original memory.
+
+After each successful pattern match, the context's _view_ (`s.view`) holds a half‑open span `[begin, end)` describing exactly what was matched. The view is not a separate object—it is two pointers into the subject string. Printing a matched span requires only the length:
+``` C
+printf("%.*s\n", (int)(s.view.end - s.view.begin), s.view.begin);
+```
+This zero‑copy model eliminates allocation during matching. Extraction to a null‑terminated C string occurs only when required by legacy APIs, via `sno_var` (copy current view) or `sno_cap` (copy from mark to cursor). Both functions perform bounds checking and leave parser state unchanged on failure.
+
+The view thus serves dual purpose: it _is_ the cursor position for the next match (`s.view.end`), and it _is_ the matched substring for immediate use. No separate assignment step is required—unlike SNOBOL's `.VAR` operator, which copies after matching. In `sno`, the match _is_ the value.
+
+## 1.3 Mark and Capture
+
+SNOBOL4 captures multi‑element spans using grouped patterns: `(P1 P2) . V`. The `sno` library exposes the underlying mechanism explicitly through a _mark_ position.
+
+Each context maintains a mark (`s.mark`) initialized to the subject start by `sno_bind` and `sno_reset`. The function `sno_mark` updates the mark to the current cursor position (`s.view.end`). Subsequent pattern matches advance the cursor while leaving the mark fixed. The span `[mark, cursor)` represents the accumulated match across multiple primitives.
+
+`sno_cap` extracts this span into a buffer with null termination:
+``` C
+sno_bind(&s, "count=42");
+sno_mark(&s);                            /* mark at 'c' */
+if (sno_any(&s, SNO_LETTERS) &&          /* match 'c' */
+    sno_span(&s, SNO_ALNUM_U) &&         /* match "ount" */
+    sno_cap(&s, id, sizeof(id)))         /* extract "count" */
+{
+    printf("%s\n", id);                  /* → count */
+}
+```
+Without marking, the view would contain only the final `sno_span` match ("ount"). The mark provides an explicit anchor—like placing a flag at the base of a snow‑capped peak before ascending—enabling reliable capture of compound tokens (identifiers, quoted strings, delimited fields) without hidden state or grouping syntax.
+
+This model preserves SNOBOL's capture semantics while making the mechanics visible and debuggable. The programmer controls exactly where capture begins; the library handles only the mechanical copy.
+
+## 1.4 Composition Idioms
+
+Patterns compose through C's native boolean operators. The semantics are deliberately minimal:
+
+-   **Sequencing (`&&`)** — The left operand executes first. On success, the cursor has advanced and the right operand executes from the new position. On failure, the entire expression fails immediately and the cursor remains at its original position (short‑circuit evaluation).
+-   **Alternation (`||`)** — The left operand executes first. On success, the entire expression succeeds and the cursor remains at the position left by the left operand. On failure, the cursor is restored to its original position and the right operand executes.
+
+This model requires no hidden state machine. The cursor position before evaluating `A || B` is identical to the position before evaluating `B` if `A` fails. Composition is therefore predictable and debuggable.
+
+## 1.5 Failure Contract
+
+Every pattern function obeys a strict invariant:
+
+> **On failure, the cursor (`s.view.end`) and mark (`s.mark`) remain unchanged.**
+
+This contract enables reliable composition. An alternation chain such as:
+``` C
+sno_any(&s, "0123456789") || sno_any(&s, "ABCDEF")
+```
+will never leave the cursor in an intermediate state if the first alternative fails. The second alternative always begins from the original position. Similarly, a sequence fails fast—the moment any component fails, subsequent components are not evaluated and the cursor is left at the failure point.
+
+This invariant is the foundation of `sno`'s safety. Extraction functions (`sno_var`, `sno_cap`) also obey it: buffer overflow causes immediate failure with no cursor advancement, preventing partial state corruption during alternation.
 
 ## 2. Patterns and Pattern Functions
 
