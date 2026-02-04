@@ -9,7 +9,7 @@ SNOBOL4 patterns are more powerful than regular expressions (Chomsky Type-3) and
 A pattern matching that is, IMHO,  more powerful and intuitive to use in C programming than regular expressions.
 
 
-## 1.1 Design Decisions
+### 1.1 Design Decisions
 
 SNOBOL4 pattern matching employs an implicit backtracking scanner. Upon failure, the scanner rewinds the cursor and explores alternative paths through the pattern structure. This mechanism simplifies expression of ambiguous grammars but introduces hidden state: the parser maintains a stack of partial matches invisible to the programmer.
 
@@ -33,7 +33,7 @@ bool parens(sno_subject_t* s) {
 The trade‑off is deliberate: `sno` requires the programmer to structure alternatives explicitly, but in return provides deterministic behavior and trivial debugging. This aligns with C's philosophy of visible state and minimal runtime machinery.
 
 
-## 1.2 Subject, View, and Extraction
+### 1.2 Subject, View, and Extraction
 
 The subject string is an immutable null‑terminated character array bound to a parsing context with `sno_bind`. No copies are made; all matching occurs in place against the original memory.
 
@@ -45,7 +45,7 @@ This zero‑copy model eliminates allocation during matching. Extraction to a nu
 
 The view thus serves dual purpose: it _is_ the cursor position for the next match (`s.view.end`), and it _is_ the matched substring for immediate use. No separate assignment step is required—unlike SNOBOL's `.VAR` operator, which copies after matching. In `sno`, the match _is_ the value.
 
-## 1.3 Mark and Capture
+### 1.3 Mark and Capture
 
 SNOBOL4 captures multi‑element spans using grouped patterns: `(P1 P2) . V`. The `sno` library exposes the underlying mechanism explicitly through a _mark_ position.
 
@@ -62,11 +62,11 @@ if (sno_any(&s, SNO_LETTERS) &&          /* match 'c' */
     printf("%s\n", id);                  /* → count */
 }
 ```
-Without marking, the view would contain only the final `sno_span` match ("ount"). The mark provides an explicit anchor—like placing a flag at the base of a snow‑capped peak before ascending—enabling reliable capture of compound tokens (identifiers, quoted strings, delimited fields) without hidden state or grouping syntax.
+Without marking, the view would contain only the final `sno_span` match ("ount"). The mark provides an explicit anchor enabling reliable capture of compound tokens (identifiers, quoted strings, delimited fields) without hidden state or grouping syntax.
 
 This model preserves SNOBOL's capture semantics while making the mechanics visible and debuggable. The programmer controls exactly where capture begins; the library handles only the mechanical copy.
 
-## 1.4 Composition Idioms
+### 1.4 Composition Idioms
 
 Patterns compose through C's native boolean operators. The semantics are deliberately minimal:
 
@@ -75,7 +75,7 @@ Patterns compose through C's native boolean operators. The semantics are deliber
 
 This model requires no hidden state machine. The cursor position before evaluating `A || B` is identical to the position before evaluating `B` if `A` fails. Composition is therefore predictable and debuggable.
 
-## 1.5 Failure Contract
+### 1.5 Failure Contract
 
 Every pattern function obeys a strict invariant:
 
