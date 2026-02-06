@@ -43,32 +43,28 @@
  *
  * @section example Example: Parse "key=value"
  * @code{.c}
- * sno_subject_t s;
- * sno_bind(&s, "host=alpha");
+ * sno_subject_t s = {0};
+ * char key[16], val[16];
  *
- * // SPAN(letters) → key
- * if (sno_span(&s, "abcdefghijklmnopqrstuvwxyz")) {
- *     sno_view_t key = s.view;
- *     if (sno_lit(&s, '=') && sno_break(&s, "\r\n")) {
- *         sno_view_t val = s.view;
- *         // Use key/val spans directly—zero copies
- *         printf("KEY='%.*s' VAL='%.*s'\n",
- *                (int)(key.end-key.begin), key.begin,
- *                (int)(val.end-val.begin), val.begin);
- *     }
+ * sno_bind(&s, "host=alpha");
+ * sno_mark(&s);
+ * if (sno_span(&s, SNO_ALNUM_U) && sno_cap(&s, key, sizeof(key)) &&
+ *     sno_ch(&s, '=') &&
+ *     sno_mark(&s) && sno_break(&s, "\r\n") && sno_cap(&s, val, sizeof(val)))
+ * {
+ *     printf("%s → %s\n", key, val);  // → host → alpha
  * }
  * @endcode
  *
  * @author Inspired by SNOBOL4 (Griswold et al., Bell Labs 1962–1967)
  * @license Public domain / MIT—use freely in any project
  */
+
 #ifndef SNO_H
 #define SNO_H
 
-#include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 /** Immutable character type alias for const-correct string handling */
 typedef const char cstr_t;
@@ -94,9 +90,12 @@ typedef struct {
 typedef struct {
     sno_view_t str;    /**< Full subject string [begin, end) including null terminator */
     sno_view_t view;   /**< Current match span [begin, end); cursor = view.end */
-    cstr_t* mark;      /**< capture start position */
+    cstr_t* mark;      /**< Capture start position */
     size_t length;     /**< Cached strlen (excluding null terminator) */
 } sno_subject_t;
+
+/** @name Subject Management */
+/** @{ */
 
 /**
  * @brief Bind subject string to parsing context
@@ -116,6 +115,12 @@ void sno_bind(sno_subject_t* s, cstr_t* c);
  * @return true if reset succeeded; false if s is NULL
  */
 bool sno_reset(sno_subject_t* s);
+
+/** @} */
+
+/** @name Literals */
+/** @{ */
+
 /**
  * @brief Match single literal character at cursor
  *
@@ -123,8 +128,26 @@ bool sno_reset(sno_subject_t* s);
  * @param s Parsing context (must not be NULL)
  * @param ch Character to match
  * @return true if match succeeds; false otherwise (cursor unchanged on failure)
+ * @note Optimized for frequent single-character matching (delimiters, operators)
  */
-bool sno_lit(sno_subject_t* s, char ch);
+bool sno_ch(sno_subject_t* s, char ch);
+
+/**
+ * @brief Match literal null-terminated string at cursor
+ *
+ * Succeeds iff subject begins with exact character sequence in 'lit'.
+ * Advances cursor by strlen(lit) on success.
+ * @param s Parsing context (must not be NULL)
+ * @param lit Null-terminated string to match (must not be NULL)
+ * @return true if literal matched; false otherwise (cursor unchanged on failure)
+ * @note Case-sensitive match. Use for keywords and multi-character tokens.
+ */
+bool sno_lit(sno_subject_t* s, const char* lit);
+
+/** @} */
+
+/** @name Length */
+/** @{ */
 
 /**
  * @brief Match exactly n characters from cursor
@@ -137,63 +160,10 @@ bool sno_lit(sno_subject_t* s, char ch);
  */
 bool sno_len(sno_subject_t* s, size_t n);
 
-/**
- * @brief Match 1+ characters from set (SNOBOL SPAN primitive)
- *
- * Consumes longest prefix of characters ALL in 'set'.
- * @param s Parsing context (must not be NULL)
- * @param set Null-terminated string of allowed characters (must not be NULL)
- * @return true if ≥1 character matched; false otherwise (cursor unchanged on failure)
- * @note Requires at least one match (unlike BREAK). Stops at first char not in set.
- */
-bool sno_span(sno_subject_t* s, const char* set);
+/** @} */
 
-/**
- * @brief Match 0+ characters until set member (SNOBOL BREAK primitive)
- *
- * Consumes longest prefix of characters NOT in 'set'.
- * @param s Parsing context (must not be NULL)
- * @param set Null-terminated string of break characters (must not be NULL)
- * @return true always (even for zero-length match); false only on NULL args
- * @note Succeeds with empty match when cursor starts at set member.
- *       Stops at first char in set (without consuming it).
- */
-bool sno_break(sno_subject_t* s, const char* set);
-
-/**
- * @brief Extract current match span into buffer (zero-copy view → copy)
- *
- * Copies s->view span [begin, end) into buf with null termination.
- * @param s Parsing context (must not be NULL)
- * @param buf Destination buffer (must not be NULL)
- * @param buflen Size of buf in bytes (must be > 0)
- * @return true if copy succeeds (len < buflen); false on buffer overflow or NULL args
- * @note Requires buflen > (end - begin) to accommodate null terminator.
- *       Does not modify cursor position.
- */
-bool sno_var(sno_subject_t* s, char* buf, size_t buflen);
-
-/**
- * @brief Place capture mark at current cursor position
- *
- * Sets the capture start to the current cursor (s.view.end).
- * @param s Parsing context (must not be NULL)
- * @return true always (even at end of string)
- * @note Default mark is start of subject (set by sno_bind/sno_reset)
- */
-bool sno_mark(sno_subject_t* s);
-
-/**
- * @brief Extract text between mark and current cursor
- *
- * Copies the span [mark, cursor) into buf with null termination.
- * @param s Parsing context (must not be NULL)
- * @param buf Destination buffer (must not be NULL)
- * @param buflen Size of buf in bytes (must be > 0)
- * @return true if copy succeeds (span length < buflen); false on overflow or NULL args
- * @note Requires prior sno_mark() or relies on default mark=start of subject
- */
-bool sno_cap(sno_subject_t* s, char* buf, size_t buflen);
+/** @name Character Sets */
+/** @{ */
 
 /**
  * @brief Match single character from set (SNOBOL ANY primitive)
@@ -219,6 +189,34 @@ bool sno_any(sno_subject_t* s, const char* set);
 bool sno_notany(sno_subject_t* s, const char* set);
 
 /**
+ * @brief Match 1+ characters from set (SNOBOL SPAN primitive)
+ *
+ * Consumes longest prefix of characters ALL in 'set'.
+ * @param s Parsing context (must not be NULL)
+ * @param set Null-terminated string of allowed characters (must not be NULL)
+ * @return true if ≥1 character matched; false otherwise (cursor unchanged on failure)
+ * @note Requires at least one match (unlike BREAK). Stops at first char not in set.
+ */
+bool sno_span(sno_subject_t* s, const char* set);
+
+/**
+ * @brief Match 0+ characters until set member (SNOBOL BREAK primitive)
+ *
+ * Consumes longest prefix of characters NOT in 'set'.
+ * @param s Parsing context (must not be NULL)
+ * @param set Null-terminated string of break characters (must not be NULL)
+ * @return true always (even for zero-length match); false only on NULL args
+ * @note Succeeds with empty match when cursor starts at set member.
+ *       Stops at first char in set (without consuming it).
+ */
+bool sno_break(sno_subject_t* s, const char* set);
+
+/** @} */
+
+/** @name Positioning */
+/** @{ */
+
+/**
  * @brief Move cursor to absolute position (SNOBOL TAB primitive)
  *
  * Matches all characters from current cursor to offset n (0-indexed).
@@ -228,6 +226,7 @@ bool sno_notany(sno_subject_t* s, const char* set);
  * @note Fails (no cursor movement) if n < current position (cannot move left)
  */
 bool sno_tab(sno_subject_t* s, size_t n);
+
 /**
  * @brief Move cursor to position from right end (SNOBOL RTAB primitive)
  *
@@ -248,7 +247,73 @@ bool sno_rtab(sno_subject_t* s, size_t n);
  */
 bool sno_rem(sno_subject_t* s);
 
-/* === Position Assertions (Optional Predicates) === */
+/** @} */
+
+/** @name Capture */
+/** @{ */
+
+/**
+ * @brief Place capture mark at current cursor position
+ *
+ * Sets the capture start to the current cursor (s.view.end).
+ * @param s Parsing context (must not be NULL)
+ * @return true always (even at end of string)
+ * @note Default mark is start of subject (set by sno_bind/sno_reset)
+ */
+bool sno_mark(sno_subject_t* s);
+
+/**
+ * @brief Extract text between mark and current cursor
+ *
+ * Copies the span [mark, cursor) into buf with null termination.
+ * @param s Parsing context (must not be NULL)
+ * @param buf Destination buffer (must not be NULL)
+ * @param buflen Size of buf in bytes (must be > 0)
+ * @return true if copy succeeds (span length < buflen); false on overflow or NULL args
+ * @note Requires prior sno_mark() or relies on default mark=start of subject
+ */
+bool sno_cap(sno_subject_t* s, char* buf, size_t buflen);
+
+/**
+ * @brief Extract current match span into buffer (zero-copy view → copy)
+ *
+ * Copies s->view span [begin, end) into buf with null termination.
+ * @param s Parsing context (must not be NULL)
+ * @param buf Destination buffer (must not be NULL)
+ * @param buflen Size of buf in bytes (must be > 0)
+ * @return true if copy succeeds (len < buflen); false on buffer overflow or NULL args
+ * @note Requires buflen > (end - begin) to accommodate null terminator.
+ *       Does not modify cursor position.
+ */
+bool sno_var(sno_subject_t* s, char* buf, size_t buflen);
+
+/** @} */
+
+/** @name Balanced Delimiters */
+/** @{ */
+
+/**
+ * @brief Match balanced delimiters (SNOBOL BAL primitive generalized)
+ *
+ * Matches a nonnull string balanced with respect to delimiter pair (open, close).
+ * Validates nesting deterministically through explicit recursion—no backtracking.
+ * The matched span includes outer delimiters (e.g., "(A)" not "A").
+ *
+ * @param s Parsing context (must not be NULL)
+ * @param open Opening delimiter character (e.g., '(', '[', '{')
+ * @param close Closing delimiter character (e.g., ')', ']', '}')
+ * @return true if balanced expression matched (cursor advanced); false otherwise (cursor unchanged)
+ * @note Fails on: missing opening delimiter, unclosed opens, mismatched nesting, or EOF before close
+ * @note Generalizes SNOBOL's hardcoded BAL (parentheses-only) to arbitrary delimiter pairs
+ * @note Every failure path rolls back cursor completely—preserves failure contract
+ * @see sno_notany for consuming non-delimiter characters within balanced content
+ */
+bool sno_bal(sno_subject_t* s, char open, char close);
+
+/** @} */
+
+/** @name Position Predicates */
+/** @{ */
 
 /**
  * @brief Test if cursor is at absolute offset n (0-indexed)
@@ -274,22 +339,6 @@ bool sno_rem(sno_subject_t* s);
  */
 #define sno_at_r(s, n) ((s) && (size_t)((s)->view.end - (s)->str.begin) == (s)->length - (n))
 
-/**
- * @brief Match balanced delimiters (SNOBOL BAL primitive generalized)
- *
- * Matches a nonnull string balanced with respect to delimiter pair (open, close).
- * Validates nesting deterministically through explicit recursion—no backtracking.
- * The matched span includes outer delimiters (e.g., "(A)" not "A").
- *
- * @param s Parsing context (must not be NULL)
- * @param open Opening delimiter character (e.g., '(', '[', '{')
- * @param close Closing delimiter character (e.g., ')', ']', '}')
- * @return true if balanced expression matched (cursor advanced); false otherwise (cursor unchanged)
- * @note Fails on: missing opening delimiter, unclosed opens, mismatched nesting, or EOF before close
- * @note Generalizes SNOBOL's hardcoded BAL (parentheses-only) to arbitrary delimiter pairs
- * @note Every failure path rolls back cursor completely via sno_rollback—preserves failure contract
- * @see sno_notany for consuming non-delimiter characters within balanced content
- */
-bool sno_bal(sno_subject_t* s, char open, char close);
+/** @} */
 
-#endif
+#endif /* SNO_H */
