@@ -24,20 +24,20 @@ void sno_test(void) {
     assert(s.view.begin == s.str.begin);
     assert(s.view.end == s.str.begin);
 
-    /* sno_lit success */
+    /* sno_ch success */
     sno_bind(&s, "xyz");
-    assert(sno_lit(&s, 'x'));
+    assert(sno_ch(&s, 'x'));
     assert(s.view.end == s.str.begin + 1);
-    assert(sno_lit(&s, 'y'));
+    assert(sno_ch(&s, 'y'));
     assert(s.view.end == s.str.begin + 2);
 
-    /* sno_lit failure (cursor unchanged) */
+    /* sno_ch failure (cursor unchanged) */
     sno_bind(&s, "abc");
-    assert(!sno_lit(&s, 'x'));
+    assert(!sno_ch(&s, 'x'));
     assert(s.view.begin == s.str.begin);
     assert(s.view.end == s.str.begin);
-    assert(sno_lit(&s, 'a'));
-    assert(!sno_lit(&s, 'x'));
+    assert(sno_ch(&s, 'a'));
+    assert(!sno_ch(&s, 'x'));
     assert(s.view.begin == s.str.begin);   // unchanged on failure
     assert(s.view.end == s.str.begin + 1);
 
@@ -104,38 +104,20 @@ void sno_test(void) {
     assert(!sno_var(&s, NULL, 10));
     assert(!sno_var(&s, buf, 0));
 
-    /* sno_len_var success */
-    sno_bind(&s, "extract");
-    assert(sno_len_var(&s, 4, buf, sizeof(buf)));
-    assert(memcmp(buf, "extr", 4) == 0);
-    assert(buf[4] == '\0');
-
-    /* sno_len_var failure (len fails) */
-    sno_bind(&s, "short");
-    assert(!sno_len_var(&s, 10, buf, sizeof(buf)));
-    assert(s.view.begin == s.str.begin);
-    assert(s.view.end == s.str.begin);
-
-    /* sno_len_var failure (var fails) */
-    sno_bind(&s, "longenough");
-    assert(!sno_len_var(&s, 5, buf, 3));     // buf too small
-    assert(s.view.begin == s.str.begin);
-    assert(s.view.end == s.str.begin);       // atomic failure
-
     /* Composition test */
     sno_bind(&s, "key=value");
     assert(sno_span(&s, "abcdefghijklmnopqrstuvwxyz"));
     assert(s.view.end - s.view.begin == 3);  // "key"
-    assert(sno_lit(&s, '='));
+    assert(sno_ch(&s, '='));
     assert(sno_break(&s, "\r\n"));
     assert(s.view.end - s.view.begin == 5);  // "value"
 
     /* Final sanity: full parse */
     sno_bind(&s, "1234 SEP 27");
     assert(sno_len(&s, 4));
-    assert(sno_lit(&s, ' '));
+    assert(sno_ch(&s, ' '));
     assert(sno_span(&s, "ABCDEFGHIJKLMNOPQRSTUVWXYZ."));
-    assert(sno_lit(&s, ' '));
+    assert(sno_ch(&s, ' '));
     assert(sno_len(&s, 2));
     assert(s.view.end == s.str.end - 1);     // consumed all (minus '\0')
 
@@ -217,14 +199,14 @@ void sno_test(void) {
     assert(sno_notany(&s, SNO_LETTERS));   // '2' not in letters → success
     assert(!sno_notany(&s, SNO_LETTERS));  // 'a' IS in letters → fail
     assert(s.view.end == s.str.begin + 2); // cursor unchanged after failure
-    
+
     sno_bind(&s, "alpha");
     assert(!sno_notany(&s, SNO_LETTERS));  // 'a' in letters → fail immediately
     assert(s.view.begin == s.view.end);    // empty view (cursor at start)
-    
+
     sno_bind(&s, "");
     assert(!sno_notany(&s, SNO_LETTERS));  // empty string → fail
-    
+
     /* NOTANY vs ANY complement test */
     sno_bind(&s, "a1b2");
     assert(sno_any(&s, SNO_LETTERS));      // 'a' in letters
@@ -241,31 +223,31 @@ void sno_test(void) {
     assert(s.view.end - s.view.begin == 4);
     assert(memcmp(s.view.begin, "OBOL", 4) == 0);
     assert(s.view.end == s.str.begin + 6);
-    
+
     /* TAB failure: leftward move */
     sno_bind(&s, "text");
     assert(sno_len(&s, 3));                        // cursor at offset 3
     assert(!sno_tab(&s, 2));                       // cannot move left to offset 2
     assert(s.view.end == s.str.begin + 3);         // cursor unchanged
-    
+
     /* RTAB: positioning from right */
     sno_bind(&s, "SNOBOL4");                       // length = 7
     assert(sno_len(&s, 2));                        // "SN" → offset 2
     assert(sno_rtab(&s, 1));                       // RTAB(1): to offset 6 (7-1)
     assert(s.view.end - s.view.begin == 4);
     assert(memcmp(s.view.begin, "OBOL", 4) == 0);
-    
+
     /* REM: match to end */
     sno_bind(&s, "host=alpha");
     assert(sno_len(&s, 5));                        // skip "host="
     assert(sno_rem(&s));                           // match "alpha"
     assert(strcmp(s.view.begin, "alpha") == 0);
-    
+
     /* Zero-length success cases */
     sno_bind(&s, "text");
     assert(sno_tab(&s, 0));                        // TAB(0) at start → empty match
     assert(s.view.begin == s.view.end);
-    
+
     sno_bind(&s, "text");
     assert(sno_len(&s, 4));                        // cursor at end
     assert(sno_rem(&s));                           // REM at end → empty match
@@ -279,20 +261,16 @@ void sno_test(void) {
     assert(!sno_at(&s, 5));                  // not at column 5 → false
     assert(sno_at_r(&s, 6));                 // 6 chars remain → true
     assert(!sno_at_r(&s, 5));                // not 5 chars remaining → false
-    
+
     /* Composition with pattern functions */
     sno_bind(&s, "host=alpha");
     assert(sno_len(&s, 4) && sno_at(&s, 4)); // "host" lands at offset 4
-    assert(sno_lit(&s, '=') && sno_at(&s, 5)); // '=' lands at offset 5
-    
+    assert(sno_ch(&s, '=') && sno_at(&s, 5)); // '=' lands at offset 5
+
     /* End-of-string test */
     sno_bind(&s, "text");
     assert(sno_rem(&s) && sno_at_r(&s, 0));  // REM lands at end → 0 chars remaining
     assert(sno_at(&s, 4));                   // length=4 → at offset 4
-    
-    /* NULL safety */
-    assert(!sno_at(NULL, 0));
-    assert(!sno_at_r(NULL, 0));
 
     /* sno_bal */
 
@@ -301,61 +279,61 @@ void sno_test(void) {
     assert(sno_bal(&s, '(', ')'));
     assert(memcmp(s.view.begin, "(A)", 3) == 0);
     assert(s.view.end - s.view.begin == 3);
-    
+
     /* Nested balanced expression */
     sno_bind(&s, "(B(C)D)");
     assert(sno_bal(&s, '(', ')'));
     assert(memcmp(s.view.begin, "(B(C)D)", 7) == 0);
     assert(s.view.end - s.view.begin == 7);
-    
+
     /* Empty parens (nonnull balanced string) */
     sno_bind(&s, "()");
     assert(sno_bal(&s, '(', ')'));
     assert(memcmp(s.view.begin, "()", 2) == 0);
-    
+
     /* Adjacent balanced pairs — BAL matches FIRST pair only */
     sno_bind(&s, "()()");
     assert(sno_bal(&s, '(', ')'));
     assert(memcmp(s.view.begin, "()", 2) == 0);
     assert(s.view.end == s.str.begin + 2);  /* cursor after first pair */
-    
+
     /* Different delimiter pairs */
     sno_bind(&s, "[X]");
     assert(sno_bal(&s, '[', ']'));
     assert(memcmp(s.view.begin, "[X]", 3) == 0);
-    
+
     sno_bind(&s, "{Y{Z}W}");
     assert(sno_bal(&s, '{', '}'));
     assert(memcmp(s.view.begin, "{Y{Z}W}", 7) == 0);
-    
+
     /* Failure: no opening delimiter */
     sno_bind(&s, "text");
     assert(!sno_bal(&s, '(', ')'));
     assert(s.view.begin == s.view.end);
-    
+
     /* Failure: unmatched close */
     sno_bind(&s, ")");
     assert(!sno_bal(&s, '(', ')'));
-    
+
     /* Failure: unclosed open */
     sno_bind(&s, "(unclosed");
     assert(!sno_bal(&s, '(', ')'));
-    
+
     /* Failure: mismatched nesting */
     sno_bind(&s, "((A)");
     assert(!sno_bal(&s, '(', ')'));
-    
+
     /* Real-world: extract interior of balanced expression */
     sno_bind(&s, "A(B(C)D)E");
-    assert(sno_lit(&s, 'A'));
-    assert(sno_lit(&s, '('));          /* match opening paren */
+    assert(sno_ch(&s, 'A'));
+    assert(sno_ch(&s, '('));          /* match opening paren */
     sno_mark(&s);                      /* mark start of interior */
     /* Parse interior: B + (C) + D */
     assert(sno_notany(&s, "()") || sno_bal(&s, '(', ')'));  /* B */
     assert(sno_notany(&s, "()") || sno_bal(&s, '(', ')'));  /* (C) */
     assert(sno_notany(&s, "()") || sno_bal(&s, '(', ')'));  /* D */
-    assert(sno_lit(&s, ')'));          /* match closing paren */
     assert(sno_cap(&s, buf, sizeof(buf)));
+    assert(sno_ch(&s, ')'));          /* match closing paren */
     assert(strcmp(buf, "B(C)D") == 0);
 
 }

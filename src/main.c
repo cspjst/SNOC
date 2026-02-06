@@ -12,7 +12,7 @@ int main() {
 
     sno_bind(&s, "host=alpha");
     if (sno_span(&s, SNO_ALNUM_U) &&         /* match "host" */
-        sno_lit(&s, '=') &&
+        sno_ch(&s, '=') &&
         sno_mark(&s) &&                      /* mark start of value */
         sno_break(&s, "\r\n") &&             /* match "alpha" */
         sno_cap(&s, val, sizeof(val)) &&     /* capture value */

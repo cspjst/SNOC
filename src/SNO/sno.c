@@ -18,12 +18,19 @@ bool sno_reset(sno_subject_t* s) {
     return true;
 }
 
-bool sno_lit(sno_subject_t* s, char ch) {
-    if(!s) return false;
+bool sno_ch(sno_subject_t* s, char ch) {
+    if (!s || *s->view.end != ch) return false;
+    s->view.begin = s->view.end++;
+    return true;
+}
+
+bool sno_lit(sno_subject_t* s, const char* lit) {
+    if (!s || !lit) return false;
     cstr_t* pos = s->view.end;
-    if(*pos != ch) return false;
+    while (*lit && *pos == *lit) { pos++; lit++; }
+    if (*lit) return false;
     s->view.begin = s->view.end;
-    s->view.end = pos + 1;
+    s->view.end = pos;
     return true;
 }
 
@@ -65,15 +72,6 @@ bool sno_var(sno_subject_t* s, char* buf, size_t buflen) {
     memcpy(buf, s->view.begin, len);
     buf[len] = '\0';
     return true;
-}
-
-bool sno_len_var(sno_subject_t* s, size_t n, char* buf, size_t buflen) {
-    if (!s) return false;
-    sno_view_t v = s->view;          // save cursor state
-    if (!sno_len(s, n)) return false;
-    if (sno_var(s, buf, buflen)) return true;
-    s->view = v;                     // rollback on extraction failure
-    return false;
 }
 
 bool sno_mark(sno_subject_t* s) {
@@ -138,21 +136,24 @@ bool sno_rem(sno_subject_t* s) {
 
 bool sno_bal(sno_subject_t* s, char open, char close) {
     if (!s) return false;
-    
+
     cstr_t* start = s->view.end;
-    char delim[3] = {open, close, '\0'};
-    
-    if (!sno_lit(s, open)) return false;     /* Match opening delimiter */
-    
-    while (*s->view.end && *s->view.end != close) {    /* Consume balanced interior */    
+    char delim[3];
+    delim[0] = open;
+    delim[1] = close;
+    delim[2] = '\0';
+
+    if (!sno_ch(s, open)) return false;     /* Match opening delimiter */
+
+    while (*s->view.end && *s->view.end != close) {    /* Consume balanced interior */
         if (*s->view.end == open) {
             if (!sno_bal(s, open, close)) return sno_rollback(s, start);
         } else {
             if (!sno_notany(s, delim)) return sno_rollback(s, start);
         }
     }
-    
-    if (!sno_lit(s, close)) return sno_rollback(s, start);    /* Match closing delimiter */
+
+    if (!sno_ch(s, close)) return sno_rollback(s, start);    /* Match closing delimiter */
 
     s->view.begin = start; /* Success: view spans entire balanced expression INCLUDING delimiters */
     return true;
