@@ -257,32 +257,62 @@ value=alpha
 
 Use `sno_var` whenever you need a standard C string for `printf`, library calls, or storage. The match happens first (`sno_len`, `sno_span`, etc.), then extraction follows in a single, safe step.
 
-### 2.6`sno_len_var` — Match and Extract in One Step
+### 2.6`sno_at` / `sno_at_r` — Cursor Position Predicates
 
-`sno_len_var(s, n, buf, len)` matches exactly `n` characters and copies them into `buf` with null termination.
+`sno_at(s, n)` and `sno_at_r(s, n)` test cursor position without advancing state.
 
-- **Success**: advances position by `n` and fills `buf` (requires `len > n` for null terminator).
-- **Failure**: leaves position unchanged (atomic rollback on buffer overflow).
+-   **`sno_at`**: succeeds if cursor is at absolute offset `n` (0-indexed from start)
+-   **`sno_at_r`**: succeeds if cursor is at offset `length - n` (leaving `n` characters at end)
+-   **Never move cursor** — pure predicates for validation/assertion
+-   **Return boolean** — composable with `&&` after pattern matches
 
-###### Example — Extract Port Number "8080"
+Use these to enforce column constraints or validate parse boundaries—exactly like SNOBOL's PCS/RPOS, but expressed idiomatically in C.
 
-```c
+###### Example — Fixed-Width Field Validation
+
+``` C
 sno_subject_t s = {0};
-char port[5];                    /* 4 digits + null terminator */
+char year[5], month[6];
 
-sno_bind(&s, "port=8080");
-if (sno_len(&s, 5) && sno_len_var(&s, 4, port, sizeof(port)) {
-    printf("%i\n", atoi(port));        
+sno_bind(&s, "1290 SEP. 27 CHINA, CHIHLI");
+
+/* Year must occupy columns 0-3 */
+sno_mark(&s);
+if (sno_len(&s, 4) && sno_at(&s, 4) && sno_cap(&s, year, sizeof(year))) {
+    printf("year=%s\n", year);          /* → year=1290 */
+}
+
+/* Skip to month field (columns 5-8) */
+sno_tab(&s, 5);
+sno_mark(&s);
+if (sno_len(&s, 4) && sno_at(&s, 9) && sno_cap(&s, month, sizeof(month))) {
+    printf("month=%s\n", month);        /* → month=SEP. */
 }
 ```
 
 ###### Output:
 
 ```
-8080
+year=1290
+month=SEP.
 ```
 
-The `&&` chain composes skipping the prefix with extraction. Because `sno_len_var` is atomic, the entire expression fails cleanly if the buffer is too small—no partial cursor advancement to corrupt subsequent parsing.
+The `sno_at` checks act as **guard rails**—if a field overruns its column boundary, the entire pattern fails cleanly.
+
+###### Example — Assert End of Line
+
+``` C
+sno_bind(&s, "host=alpha");
+if (sno_span(&s, SNO_ALNUM_U) &&
+    sno_lit(&s, '=') &&
+    sno_rem(&s) &&
+    sno_at_r(&s, 0))                    /* cursor at end → valid line */
+{
+    printf("valid assignment\n");
+}
+```
+
+`sno_at_r(s, 0)` is the way to assert "consumed the entire line"—critical for line-oriented parsers that must reject trailing garbage.
 
 ### 2.7 `sno_mark` — Place Capture Mark at Current Position
 
@@ -521,59 +551,7 @@ host = alpha.beta.gamma
 `sno_rem` is the endpoint for line-oriented parsing—consume everything that remains without counting characters.
 
 
-### 2.14 `sno_at` / `sno_at_r` — Cursor Position Predicates
-
-`sno_at(s, n)` and `sno_at_r(s, n)` test cursor position without advancing state.
-
--   **`sno_at`**: succeeds if cursor is at absolute offset `n` (0-indexed from start)
--   **`sno_at_r`**: succeeds if cursor is at offset `length - n` (leaving `n` characters at end)
--   **Never move cursor** — pure predicates for validation/assertion
--   **Return boolean** — composable with `&&` after pattern matches
-
-Use these to enforce column constraints or validate parse boundaries—exactly like SNOBOL's PCS/RPOS, but expressed idiomatically in C.
-
-###### Example — Fixed-Width Field Validation
-``` C
-sno_subject_t s = {0};
-char year[5], month[6];
-
-sno_bind(&s, "1290 SEP. 27 CHINA, CHIHLI");
-
-/* Year must occupy columns 0-3 */
-sno_mark(&s);
-if (sno_len(&s, 4) && sno_at(&s, 4) && sno_cap(&s, year, sizeof(year))) {
-    printf("year=%s\n", year);          /* → year=1290 */
-}
-
-/* Skip to month field (columns 5-8) */
-sno_tab(&s, 5);
-sno_mark(&s);
-if (sno_len(&s, 4) && sno_at(&s, 9) && sno_cap(&s, month, sizeof(month))) {
-    printf("month=%s\n", month);        /* → month=SEP. */
-}
-```
-###### Output:
-```
-year=1290
-month=SEP.
-```
-The `sno_at` checks act as **guard rails**—if a field overruns its column boundary, the entire pattern fails cleanly.
-
-###### Example — Assert End of Line
-``` C
-sno_bind(&s, "host=alpha");
-if (sno_span(&s, SNO_ALNUM_U) &&
-    sno_lit(&s, '=') &&
-    sno_rem(&s) &&
-    sno_at_r(&s, 0))                    /* cursor at end → valid line */
-{
-    printf("valid assignment\n");
-}
-```
-`sno_at_r(s, 0)` is the way to assert "consumed the entire line"—critical for line-oriented parsers that must reject trailing garbage.
-
-
-### 2.15 `sno_bal` — Match Balanced Delimiters
+### 2.14 `sno_bal` — Match Balanced Delimiters
 
 `sno_bal(s, open, close)` matches a nonnull string balanced with respect to delimiter pair `open`/`close`.
 
