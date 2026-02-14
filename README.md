@@ -83,6 +83,8 @@ If the first `sno_any` fails, the second begins from the *original* position—n
 
 ## 2. Pattern Primitives
 
+Herein, 15 core primitives grouped by SNOBOL semantics (Subject, Literals, Length, Character Sets, Positioning, Capture, Balanced Delimiters, Predicates).
+
 ### 2.1 Subject Management
 
 #### 2.1.1 `sno_bind` — Establish Subject String
